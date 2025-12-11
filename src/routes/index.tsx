@@ -1,118 +1,253 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../lib/api";
+import { Button } from "../components/ui/button";
 import {
-  Zap,
-  Server,
-  Route as RouteIcon,
-  Shield,
-  Waves,
-  Sparkles,
-} from 'lucide-react'
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "../components/ui/card";
+import { Users, Activity, QrCode, Trash2, Play } from "lucide-react";
 
-export const Route = createFileRoute('/')({ component: App })
+export const Route = createFileRoute("/")({ component: AdminPanel });
 
-function App() {
-  const features = [
-    {
-      icon: <Zap className="w-12 h-12 text-cyan-400" />,
-      title: 'Powerful Server Functions',
-      description:
-        'Write server-side code that seamlessly integrates with your client components. Type-safe, secure, and simple.',
-    },
-    {
-      icon: <Server className="w-12 h-12 text-cyan-400" />,
-      title: 'Flexible Server Side Rendering',
-      description:
-        'Full-document SSR, streaming, and progressive enhancement out of the box. Control exactly what renders where.',
-    },
-    {
-      icon: <RouteIcon className="w-12 h-12 text-cyan-400" />,
-      title: 'API Routes',
-      description:
-        'Build type-safe API endpoints alongside your application. No separate backend needed.',
-    },
-    {
-      icon: <Shield className="w-12 h-12 text-cyan-400" />,
-      title: 'Strongly Typed Everything',
-      description:
-        'End-to-end type safety from server to client. Catch errors before they reach production.',
-    },
-    {
-      icon: <Waves className="w-12 h-12 text-cyan-400" />,
-      title: 'Full Streaming Support',
-      description:
-        'Stream data from server to client progressively. Perfect for AI applications and real-time updates.',
-    },
-    {
-      icon: <Sparkles className="w-12 h-12 text-cyan-400" />,
-      title: 'Next Generation Ready',
-      description:
-        'Built from the ground up for modern web applications. Deploy anywhere JavaScript runs.',
-    },
-  ]
+function AdminPanel() {
+	const queryClient = useQueryClient();
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      <section className="relative py-20 px-6 text-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10"></div>
-        <div className="relative max-w-5xl mx-auto">
-          <div className="flex items-center justify-center gap-6 mb-6">
-            <img
-              src="/tanstack-circle-logo.png"
-              alt="TanStack Logo"
-              className="w-24 h-24 md:w-32 md:h-32"
-            />
-            <h1 className="text-6xl md:text-7xl font-black text-white [letter-spacing:-0.08em]">
-              <span className="text-gray-300">TANSTACK</span>{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                START
-              </span>
-            </h1>
-          </div>
-          <p className="text-2xl md:text-3xl text-gray-300 mb-4 font-light">
-            The framework for next generation AI applications
-          </p>
-          <p className="text-lg text-gray-400 max-w-3xl mx-auto mb-8">
-            Full-stack framework powered by TanStack Router for React and Solid.
-            Build modern applications with server functions, streaming, and type
-            safety.
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <a
-              href="https://tanstack.com/start"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-cyan-500/50"
-            >
-              Documentation
-            </a>
-            <p className="text-gray-400 text-sm mt-2">
-              Begin your TanStack Start journey by editing{' '}
-              <code className="px-2 py-1 bg-slate-700 rounded text-cyan-400">
-                /src/routes/index.tsx
-              </code>
-            </p>
-          </div>
-        </div>
-      </section>
+	// Auto-refresh state every 2 seconds
+	const { data: state, isLoading } = useQuery({
+		queryKey: ["admin-state"],
+		queryFn: api.getState,
+		refetchInterval: 2000,
+	});
 
-      <section className="py-16 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10"
-            >
-              <div className="mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold text-white mb-3">
-                {feature.title}
-              </h3>
-              <p className="text-gray-400 leading-relaxed">
-                {feature.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
+	const createSessionMutation = useMutation({
+		mutationFn: api.createSession,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["admin-state"] });
+		},
+	});
+
+	const switchActivityMutation = useMutation({
+		mutationFn: (activity: string) => api.switchActivity(activity),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["admin-state"] });
+		},
+	});
+
+	const endSessionMutation = useMutation({
+		mutationFn: api.endSession,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["admin-state"] });
+		},
+	});
+
+	const session = state?.session;
+	const players = state?.players || [];
+	const clients = players.filter((p) => p.role === "client");
+
+	// Generate QR code URL
+	const clientUrl = session
+		? `https://mikiwikipolvoron.github.io/wilco-client/?session=${session.id}`
+		: "";
+	const entertainerUrl = session
+		? `https://mikiwikipolvoron.github.io/wilco-entertainer/?session=${session.id}`
+		: "";
+	const qrCodeUrl = clientUrl
+		? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(clientUrl)}`
+		: "";
+
+	const activities = [
+		{ id: "lobby", label: "Lobby", icon: Users },
+		{ id: "beats", label: "Beats", icon: Activity },
+		{ id: "ar", label: "AR", icon: QrCode },
+		{ id: "instruments", label: "Instruments", icon: Play },
+		{ id: "energizer", label: "Energizer", icon: Activity },
+	];
+
+	return (
+		<div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-8">
+			<div className="max-w-6xl mx-auto">
+				<h1 className="text-4xl font-bold text-white mb-8">
+					WILCO Admin Panel
+				</h1>
+
+				{/* Session Control */}
+				<Card className="mb-6">
+					<CardHeader>
+						<CardTitle>Session Control</CardTitle>
+						<CardDescription>
+							Create and manage your WILCO session
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{!session ? (
+							<Button
+								onClick={() => createSessionMutation.mutate()}
+								disabled={createSessionMutation.isPending}
+								size="lg"
+							>
+								{createSessionMutation.isPending ? "Creating..." : "Create New Session"}
+							</Button>
+						) : (
+							<div className="space-y-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<p className="text-sm text-gray-400">Session ID</p>
+										<p className="text-3xl font-mono font-bold text-cyan-400">
+											{session.id}
+										</p>
+										<p className="text-xs text-gray-500 mt-1">
+											Created:{" "}
+											{new Date(session.createdAt).toLocaleString()}
+										</p>
+									</div>
+									<Button
+										variant="destructive"
+										onClick={() => endSessionMutation.mutate()}
+										disabled={endSessionMutation.isPending}
+									>
+										<Trash2 className="w-4 h-4 mr-2" />
+										End Session
+									</Button>
+								</div>
+							</div>
+						)}
+					</CardContent>
+				</Card>
+
+				{/* QR Code and URLs */}
+				{session && (
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+						<Card>
+							<CardHeader>
+								<CardTitle>Client Access</CardTitle>
+								<CardDescription>
+									Visitors scan this QR code to join
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="flex flex-col items-center">
+								{qrCodeUrl && (
+									<img
+										src={qrCodeUrl}
+										alt="QR Code for clients"
+										className="mb-4 rounded-lg border border-slate-700"
+									/>
+								)}
+								<code className="text-xs text-gray-400 break-all text-center">
+									{clientUrl}
+								</code>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader>
+								<CardTitle>Entertainer Access</CardTitle>
+								<CardDescription>
+									Open this on the performer's device
+								</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<div className="space-y-3">
+									<div>
+										<p className="text-sm text-gray-400 mb-2">Entertainer URL:</p>
+										<code className="text-xs text-cyan-400 break-all block bg-slate-900 p-3 rounded">
+											{entertainerUrl}
+										</code>
+									</div>
+									<div className="flex items-center gap-2">
+										<span className="text-sm text-gray-400">Status:</span>
+										{session.entertainerConnected ? (
+											<span className="text-green-400 font-semibold">● Connected</span>
+										) : (
+											<span className="text-red-400 font-semibold">● Disconnected</span>
+										)}
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+					</div>
+				)}
+
+				{/* Activity Control */}
+				{session && (
+					<Card className="mb-6">
+						<CardHeader>
+							<CardTitle>Activity Control</CardTitle>
+							<CardDescription>
+								Current activity: <span className="text-cyan-400 font-semibold">{session.activity}</span>
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+								{activities.map((act) => {
+									const Icon = act.icon;
+									const isActive = session.activity === act.id;
+									return (
+										<Button
+											key={act.id}
+											variant={isActive ? "default" : "outline"}
+											onClick={() => switchActivityMutation.mutate(act.id)}
+											disabled={switchActivityMutation.isPending || isActive}
+											className="flex flex-col h-auto py-4"
+										>
+											<Icon className="w-6 h-6 mb-2" />
+											{act.label}
+										</Button>
+									);
+								})}
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Player List */}
+				{session && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Users className="w-5 h-5" />
+								Connected Players ({clients.length})
+							</CardTitle>
+							<CardDescription>
+								Real-time list of participants
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							{clients.length === 0 ? (
+								<p className="text-gray-500 text-center py-8">
+									No players connected yet
+								</p>
+							) : (
+								<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+									{clients.map((player) => (
+										<div
+											key={player.id}
+											className="bg-slate-900/50 border border-slate-700 rounded px-3 py-2"
+										>
+											<p className="font-medium text-gray-200">
+												{player.nickname}
+											</p>
+											<p className="text-xs text-gray-500 font-mono">
+												{player.id.slice(0, 8)}
+											</p>
+										</div>
+									))}
+								</div>
+							)}
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Loading State */}
+				{isLoading && !state && (
+					<div className="text-center text-gray-400 py-12">
+						Loading admin panel...
+					</div>
+				)}
+			</div>
+		</div>
+	);
 }
